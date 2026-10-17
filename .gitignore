@@ -1,0 +1,19 @@
+local.properties
+.env
+*.keystore
+.gradle/
+build/
+.idea/
+*.iml
+.kotlin/
+.cxx/
+captures/
+AGENTS.override.md
+
+# Dokümanlar ve AI ajan dosyaları yerelde kalır; yalnızca README paylaşılır
+*.md
+!README.md
+.git-ai/
+
+# Orijinal tasarım paketi (hafif kopyaları docs/design/ altında)
+Sesli Planlay*.html
