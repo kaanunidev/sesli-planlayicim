@@ -1,7 +1,9 @@
 package com.sesliplanlayici.app
 
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
@@ -15,20 +17,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import com.sesliplanlayici.app.core.ui.theme.SesliPlanlayiciTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        // The app is light-only, so keep dark system bar icons even when the device is in dark mode.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+        )
         setContent {
-            MaterialTheme {
+            SesliPlanlayiciTheme {
                 PlaceholderContent()
             }
         }
     }
 }
 
-// Temporary screen until the theme and the first real screen land.
+// Temporary screen until the first real screen lands.
 @Composable
 private fun PlaceholderContent() {
     Scaffold { innerPadding ->
@@ -40,7 +47,7 @@ private fun PlaceholderContent() {
         ) {
             Text(
                 text = stringResource(R.string.app_name),
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.headlineLarge,
             )
         }
     }
@@ -49,7 +56,7 @@ private fun PlaceholderContent() {
 @Preview(showBackground = true)
 @Composable
 private fun PlaceholderContentPreview() {
-    MaterialTheme {
+    SesliPlanlayiciTheme {
         PlaceholderContent()
     }
 }

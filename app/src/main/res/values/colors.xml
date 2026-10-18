@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Window and launcher colors; Compose colors live in core/ui/theme/Color.kt. -->
+    <color name="background">#F3F4EE</color>
+    <color name="ic_launcher_background">#C2461C</color>
+</resources>
