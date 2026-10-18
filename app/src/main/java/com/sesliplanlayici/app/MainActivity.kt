@@ -6,17 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.tooling.preview.Preview
+import com.sesliplanlayici.app.capture.ui.CaptureScreen
 import com.sesliplanlayici.app.core.ui.theme.SesliPlanlayiciTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -31,34 +21,8 @@ class MainActivity : ComponentActivity() {
         )
         setContent {
             SesliPlanlayiciTheme {
-                PlaceholderContent()
+                CaptureScreen()
             }
         }
-    }
-}
-
-// Temporary screen until the first real screen lands.
-@Composable
-private fun PlaceholderContent() {
-    Scaffold { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = stringResource(R.string.app_name),
-                style = MaterialTheme.typography.headlineLarge,
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun PlaceholderContentPreview() {
-    SesliPlanlayiciTheme {
-        PlaceholderContent()
     }
 }

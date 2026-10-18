@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Sesli Planlayıcı</string>
+
+    <!-- Capture -->
+    <string name="capture_title">Gününü anlat</string>
+    <string name="capture_mic_content_description">Gününü anlat, kayda başla</string>
+    <string name="capture_hint">İpucu: gün ve saati söylersen daha az düzeltme gerekir.</string>
+    <string name="capture_mic_rationale">Gününü sesle anlatabilmen için mikrofon izni gerekiyor. Ses kaydı saklanmaz, yalnızca metne çevrilir.</string>
+    <string name="capture_mic_blocked">Mikrofon izni kapalı. Ayarlardan açabilirsin.</string>
+    <string name="capture_open_settings">Ayarları aç</string>
 </resources>
