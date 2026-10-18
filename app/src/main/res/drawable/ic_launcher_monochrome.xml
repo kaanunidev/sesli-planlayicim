@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Single-color version of ic_launcher_foreground for themed icons (Android 13+); the system tints it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.104"
+        android:scaleY="0.104"
+        android:translateX="-11.21"
+        android:translateY="-0.70">
+        <path
+            android:pathData="M750,470V390a45,45 0,0 0,-45 -45H430a45,45 0,0 0,-45 45V725a45,45 0,0 0,45 45H685"
+            android:strokeWidth="28"
+            android:strokeColor="#FFFFFF"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M485,382H650a20,20 0,0 0,20 -20V328a20,20 0,0 0,-20 -20H619A52,52 0,0 0,515 308H485a20,20 0,0 0,-20 20V362a20,20 0,0 0,20 20Z M552,305a15,15 0,1 0,30 0a15,15 0,1 0,-30 0Z" />
+        <path
+            android:pathData="M447,462L471,485L511,442M447,557L471,580L511,537"
+            android:strokeWidth="22"
+            android:strokeColor="#FFFFFF"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M552,462H682M552,558H657M552,660H637"
+            android:strokeWidth="26"
+            android:strokeColor="#FFFFFF"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M450,660a22,22 0,1 0,44 0a22,22 0,1 0,-44 0Z"
+            android:strokeWidth="14"
+            android:strokeColor="#FFFFFF" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M775,483a63,63 0,0 1,63 63V632a63,63 0,0 1,-126 0V546a63,63 0,0 1,63 -63Z" />
+        <path
+            android:pathData="M680,605a95,95 0,0 0,190 0M775,700V773M722,775H828"
+            android:strokeWidth="26"
+            android:strokeColor="#FFFFFF"
+            android:strokeLineCap="round" />
+    </group>
+</vector>
