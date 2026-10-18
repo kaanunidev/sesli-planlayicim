@@ -9,4 +9,17 @@
     <string name="capture_mic_rationale">Gününü sesle anlatabilmen için mikrofon izni gerekiyor. Ses kaydı saklanmaz, yalnızca metne çevrilir.</string>
     <string name="capture_mic_blocked">Mikrofon izni kapalı. Ayarlardan açabilirsin.</string>
     <string name="capture_open_settings">Ayarları aç</string>
+    <string name="capture_listening">Dinliyorum</string>
+    <string name="capture_said_label">SÖYLEDİKLERİN</string>
+    <string name="capture_listening_placeholder">Seni dinliyorum, gününü anlat…</string>
+    <string name="capture_finish">Bitir</string>
+    <string name="capture_cancel">İptal</string>
+    <string name="capture_result_title">Söylediklerin</string>
+    <string name="capture_retry">Tekrar konuş</string>
+    <string name="capture_empty_result">Bir şey duyamadım. Tekrar dener misin?</string>
+    <string name="capture_error_network">Konuşma tanıma için internet bağlantısı gerekiyor. Bağlantını kontrol edip tekrar dene.</string>
+    <string name="capture_error_language">Bu cihazda Türkçe konuşma tanıma şu an kullanılamıyor.</string>
+    <string name="capture_error_unavailable">Bu cihazda konuşma tanıma bulunamadı.</string>
+    <string name="capture_error_busy">Konuşma tanıma şu an meşgul. Biraz sonra tekrar dene.</string>
+    <string name="capture_error_generic">Bir şeyler ters gitti. Tekrar dener misin?</string>
 </resources>

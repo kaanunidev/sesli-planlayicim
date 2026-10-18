@@ -23,6 +23,7 @@ private val AppColorScheme = lightColorScheme(
     onSurfaceVariant = TextSecondary,
     inverseSurface = TextPrimary,
     inverseOnSurface = Background,
+    inversePrimary = RecordingAccent,
 )
 
 private val AppShapes = Shapes(

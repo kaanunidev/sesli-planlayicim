@@ -10,6 +10,9 @@ internal val TextSecondary = Color(0xFF5B6560)
 internal val Accent = Color(0xFFC2461C)
 internal val Success = Color(0xFF2F6F62)
 
+// Accent on the dark recording screen (live dot, sound bars).
+internal val RecordingAccent = Color(0xFFF6A07F)
+
 // Chip background on cards.
 internal val Chip = Color(0xFFE9EBE3)
 
