@@ -2,6 +2,11 @@ name = "sesli-planlayici-proxy"
 main = "src/index.ts"
 compatibility_date = "2026-10-01"
 
+# Served at https://sesli-planlayici-proxy.<account subdomain>.workers.dev.
+# Per-version preview URLs would expose every upload publicly; not needed.
+workers_dev = true
+preview_urls = false
+
 # Not secret. GEMINI_API_KEY and SYSTEM_PROMPT are Worker secrets (wrangler secret put),
 # locally they come from .dev.vars (gitignored).
 [vars]
