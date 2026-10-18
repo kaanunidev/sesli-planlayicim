@@ -1,6 +1,8 @@
 local.properties
 .env
 .dev.vars
+# AI prompt (Cloudflare secret SYSTEM_PROMPT; kept off GitHub, see DECISIONS #13)
+proxy/system-prompt.txt
 .wrangler/
 node_modules/
 *.keystore
