@@ -21,5 +21,9 @@
     <string name="capture_error_language">Bu cihazda Türkçe konuşma tanıma şu an kullanılamıyor.</string>
     <string name="capture_error_unavailable">Bu cihazda konuşma tanıma bulunamadı.</string>
     <string name="capture_error_busy">Konuşma tanıma şu an meşgul. Biraz sonra tekrar dene.</string>
+    <string name="capture_nothing_heard_title">Seni duyamadım</string>
+    <string name="capture_nothing_heard_body">Mikrofonun açık mı, bir kontrol eder misin? Hazır olunca tekrar dene.</string>
+    <string name="capture_try_again">Tekrar dene</string>
+    <string name="capture_give_up">Vazgeç</string>
     <string name="capture_error_generic">Bir şeyler ters gitti. Tekrar dener misin?</string>
 </resources>

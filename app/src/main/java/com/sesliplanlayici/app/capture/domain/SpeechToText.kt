@@ -20,6 +20,9 @@ sealed interface SpeechEvent {
 enum class SpeechError {
     /** Silence or nothing recognizable; the session simply ended. */
     NoSpeech,
+
+    /** The recognition service dropped the session (seen after several silent sessions in a row). */
+    Interrupted,
     Network,
     LanguageUnavailable,
     NotAvailable,
@@ -28,7 +31,7 @@ enum class SpeechError {
     Other;
 
     /** Errors after which listening continues with a new session. */
-    val isRecoverable: Boolean get() = this == NoSpeech
+    val isRecoverable: Boolean get() = this == NoSpeech || this == Interrupted
 }
 
 /** Joins recognized segments into one transcript; blank segments are skipped. */

@@ -97,6 +97,7 @@ fun CaptureScreen(viewModel: CaptureViewModel = hiltViewModel()) {
         onFinish = viewModel::finish,
         onCancel = viewModel::reset,
         onRetry = viewModel::reset,
+        onTryAgain = viewModel::startListening,
     )
 }
 
@@ -122,11 +123,66 @@ fun CaptureContent(
     onFinish: () -> Unit,
     onCancel: () -> Unit,
     onRetry: () -> Unit,
+    onTryAgain: () -> Unit,
 ) {
     when (state.phase) {
         CapturePhase.Idle -> IdleContent(permission, state.error, onMicClick, onOpenSettings)
         CapturePhase.Listening -> ListeningContent(state, onFinish, onCancel)
+        CapturePhase.NothingHeard -> NothingHeardContent(onTryAgain = onTryAgain, onGiveUp = onCancel)
         CapturePhase.Finished -> FinishedContent(state, onRetry)
+    }
+}
+
+@Composable
+private fun NothingHeardContent(
+    onTryAgain: () -> Unit,
+    onGiveUp: () -> Unit,
+) {
+    Surface(color = MaterialTheme.colorScheme.background) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .safeDrawingPadding()
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_mic),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(40.dp),
+            )
+            Text(
+                text = stringResource(R.string.capture_nothing_heard_title),
+                style = MaterialTheme.typography.headlineMedium,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                text = stringResource(R.string.capture_nothing_heard_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(8.dp))
+            Button(
+                onClick = onTryAgain,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = MaterialTheme.shapes.medium,
+            ) {
+                Text(stringResource(R.string.capture_try_again), style = MaterialTheme.typography.labelLarge)
+            }
+            TextButton(
+                onClick = onGiveUp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+            ) {
+                Text(stringResource(R.string.capture_give_up))
+            }
+        }
     }
 }
 
@@ -307,7 +363,7 @@ private fun FinishedContent(
 
 private fun SpeechError.messageRes(): Int = when (this) {
     SpeechError.NoSpeech -> R.string.capture_empty_result
-    SpeechError.Network -> R.string.capture_error_network
+    SpeechError.Interrupted, SpeechError.Network -> R.string.capture_error_network
     SpeechError.LanguageUnavailable -> R.string.capture_error_language
     SpeechError.NotAvailable -> R.string.capture_error_unavailable
     SpeechError.Busy -> R.string.capture_error_busy
@@ -329,9 +385,14 @@ private fun CapturePreview(state: CaptureUiState, permission: MicPermissionStatu
             onFinish = {},
             onCancel = {},
             onRetry = {},
+            onTryAgain = {},
         )
     }
 }
+
+@Preview(showBackground = true)
+@Composable
+private fun NothingHeardPreview() = CapturePreview(CaptureUiState(phase = CapturePhase.NothingHeard))
 
 @Preview(showBackground = true)
 @Composable

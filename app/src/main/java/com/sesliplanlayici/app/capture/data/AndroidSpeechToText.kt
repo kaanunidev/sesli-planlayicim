@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.util.Log
 import com.sesliplanlayici.app.capture.domain.SpeechError
 import com.sesliplanlayici.app.capture.domain.SpeechEvent
 import com.sesliplanlayici.app.capture.domain.SpeechToText
@@ -41,6 +42,8 @@ class AndroidSpeechToText @Inject constructor(
             }
 
             override fun onError(error: Int) {
+                // Only the numeric code is logged, never the transcript.
+                Log.d(TAG, "Recognizer error code=$error mapped=${speechErrorFromCode(error)}")
                 trySend(SpeechEvent.Failed(speechErrorFromCode(error)))
                 close()
             }
@@ -71,6 +74,7 @@ class AndroidSpeechToText @Inject constructor(
         this?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
 
     private companion object {
+        const val TAG = "SpeechToText"
         const val LANGUAGE_TAG = "tr-TR"
     }
 }
@@ -80,10 +84,12 @@ internal fun speechErrorFromCode(code: Int): SpeechError = when (code) {
     SpeechRecognizer.ERROR_SPEECH_TIMEOUT,
     -> SpeechError.NoSpeech
 
+    // Google's service sends this after ~7 silent sessions in a row even when online.
+    SpeechRecognizer.ERROR_SERVER_DISCONNECTED -> SpeechError.Interrupted
+
     SpeechRecognizer.ERROR_NETWORK,
     SpeechRecognizer.ERROR_NETWORK_TIMEOUT,
     SpeechRecognizer.ERROR_SERVER,
-    SpeechRecognizer.ERROR_SERVER_DISCONNECTED,
     -> SpeechError.Network
 
     SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED,

@@ -23,8 +23,9 @@ class SpeechToTextTest {
     }
 
     @Test
-    fun onlySilenceKeepsListening() {
-        assertTrue(SpeechError.NoSpeech.isRecoverable)
-        SpeechError.entries.filter { it != SpeechError.NoSpeech }.forEach { assertFalse(it.name, it.isRecoverable) }
+    fun onlySilenceAndInterruptionKeepListening() {
+        val recoverable = setOf(SpeechError.NoSpeech, SpeechError.Interrupted)
+        recoverable.forEach { assertTrue(it.name, it.isRecoverable) }
+        SpeechError.entries.filter { it !in recoverable }.forEach { assertFalse(it.name, it.isRecoverable) }
     }
 }

@@ -21,6 +21,12 @@ class SpeechErrorMappingTest {
     }
 
     @Test
+    fun serverDisconnectIsInterruptionNotNetwork() {
+        // Seen on device after ~35 s of silence while online (logcat: code=11).
+        assertEquals(SpeechError.Interrupted, speechErrorFromCode(SpeechRecognizer.ERROR_SERVER_DISCONNECTED))
+    }
+
+    @Test
     fun missingTurkishIsLanguageUnavailable() {
         assertEquals(SpeechError.LanguageUnavailable, speechErrorFromCode(SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE))
     }
