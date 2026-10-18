@@ -14,7 +14,6 @@
     <string name="capture_listening_placeholder">Seni dinliyorum, gününü anlat…</string>
     <string name="capture_finish">Bitir</string>
     <string name="capture_cancel">İptal</string>
-    <string name="capture_result_title">Söylediklerin</string>
     <string name="capture_retry">Tekrar konuş</string>
     <string name="capture_empty_result">Bir şey duyamadım. Tekrar dener misin?</string>
     <string name="capture_error_network">Konuşma tanıma için internet bağlantısı gerekiyor. Bağlantını kontrol edip tekrar dene.</string>
@@ -25,5 +24,22 @@
     <string name="capture_nothing_heard_body">Mikrofonun açık mı, bir kontrol eder misin? Hazır olunca tekrar dene.</string>
     <string name="capture_try_again">Tekrar dene</string>
     <string name="capture_give_up">Vazgeç</string>
+    <string name="capture_extracting">Görevlerini çıkarıyorum…</string>
+    <plurals name="capture_result_plan_title">
+        <item quantity="one">%d iş buldum</item>
+        <item quantity="other">%d iş buldum</item>
+    </plurals>
+    <string name="capture_draft_no_date">Gün seçilmedi</string>
+    <string name="capture_draft_no_time">Saat yok · gün içinde</string>
+    <string name="capture_draft_duration">%d dk</string>
+    <string name="capture_off_topic">Bunu bir plan olarak anlayamadım. Gününü anlatır mısın?</string>
+    <string name="capture_nothing_planned">Bugün için yapılacak bir iş duymadım. Aklına bir şey gelirse tekrar konuşabilirsin.</string>
+    <string name="capture_failure_offline">İnternet bağlantın yok gibi görünüyor. Bağlanınca tekrar dene.</string>
+    <string name="capture_failure_rate_limited">Şu an biraz yoğunuz. Birkaç saniye sonra tekrar dener misin?</string>
+    <string name="capture_failure_server">Görevlerini şu an çıkaramadım. Tekrar dener misin?</string>
+    <string name="capture_failure_bad_response">Söylediklerini görevlere çeviremedim. Tekrar dener misin?</string>
+    <string name="capture_failure_not_configured">Sunucu adresi ayarlanmamış (local.properties → proxy.baseUrl).</string>
+    <string name="capture_show_transcript">Söylediklerini göster</string>
+    <string name="capture_hide_transcript">Söylediklerini gizle</string>
     <string name="capture_error_generic">Bir şeyler ters gitti. Tekrar dener misin?</string>
 </resources>

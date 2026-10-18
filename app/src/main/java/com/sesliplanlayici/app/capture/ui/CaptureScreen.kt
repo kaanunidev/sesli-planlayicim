@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,6 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -47,15 +50,25 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sesliplanlayici.app.R
+import com.sesliplanlayici.app.capture.domain.ExtractionFailure
+import com.sesliplanlayici.app.capture.domain.ExtractionResult
 import com.sesliplanlayici.app.capture.domain.SpeechError
+import com.sesliplanlayici.app.capture.domain.TaskDraft
 import com.sesliplanlayici.app.core.ui.findActivity
 import com.sesliplanlayici.app.core.ui.openAppSettings
 import com.sesliplanlayici.app.core.ui.theme.SesliPlanlayiciTheme
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 private const val MIC_PERMISSION = Manifest.permission.RECORD_AUDIO
+private val DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMMM EEEE", Locale.forLanguageTag("tr-TR"))
+private val TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
 /**
- * Prototype capture screen: microphone permission, live speech-to-text and the raw transcript.
+ * Prototype capture screen: microphone permission, live speech-to-text, then the tasks the AI
+ * extracted, shown raw. The real review cards come in phase 1.
  * The permission is asked when the user taps the mic, not on launch.
  */
 @Composable
@@ -96,8 +109,9 @@ fun CaptureScreen(viewModel: CaptureViewModel = hiltViewModel()) {
         onOpenSettings = { context.openAppSettings() },
         onFinish = viewModel::finish,
         onCancel = viewModel::reset,
-        onRetry = viewModel::reset,
-        onTryAgain = viewModel::startListening,
+        onSpeakAgain = viewModel::reset,
+        onListenAgain = viewModel::startListening,
+        onRetryExtraction = viewModel::retryExtraction,
     )
 }
 
@@ -122,67 +136,16 @@ fun CaptureContent(
     onOpenSettings: () -> Unit,
     onFinish: () -> Unit,
     onCancel: () -> Unit,
-    onRetry: () -> Unit,
-    onTryAgain: () -> Unit,
+    onSpeakAgain: () -> Unit,
+    onListenAgain: () -> Unit,
+    onRetryExtraction: () -> Unit,
 ) {
     when (state.phase) {
         CapturePhase.Idle -> IdleContent(permission, state.error, onMicClick, onOpenSettings)
         CapturePhase.Listening -> ListeningContent(state, onFinish, onCancel)
-        CapturePhase.NothingHeard -> NothingHeardContent(onTryAgain = onTryAgain, onGiveUp = onCancel)
-        CapturePhase.Finished -> FinishedContent(state, onRetry)
-    }
-}
-
-@Composable
-private fun NothingHeardContent(
-    onTryAgain: () -> Unit,
-    onGiveUp: () -> Unit,
-) {
-    Surface(color = MaterialTheme.colorScheme.background) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .safeDrawingPadding()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Icon(
-                painter = painterResource(R.drawable.ic_mic),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(40.dp),
-            )
-            Text(
-                text = stringResource(R.string.capture_nothing_heard_title),
-                style = MaterialTheme.typography.headlineMedium,
-                textAlign = TextAlign.Center,
-            )
-            Text(
-                text = stringResource(R.string.capture_nothing_heard_body),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(8.dp))
-            Button(
-                onClick = onTryAgain,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = MaterialTheme.shapes.medium,
-            ) {
-                Text(stringResource(R.string.capture_try_again), style = MaterialTheme.typography.labelLarge)
-            }
-            TextButton(
-                onClick = onGiveUp,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-            ) {
-                Text(stringResource(R.string.capture_give_up))
-            }
-        }
+        CapturePhase.NothingHeard -> NothingHeardContent(onTryAgain = onListenAgain, onGiveUp = onCancel)
+        CapturePhase.Extracting -> ExtractingContent()
+        CapturePhase.Result -> ResultContent(state, onSpeakAgain, onRetryExtraction)
     }
 }
 
@@ -291,15 +254,7 @@ private fun ListeningContent(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Button(
-                onClick = onFinish,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = MaterialTheme.shapes.medium,
-            ) {
-                Text(stringResource(R.string.capture_finish), style = MaterialTheme.typography.labelLarge)
-            }
+            PrimaryButton(text = stringResource(R.string.capture_finish), onClick = onFinish)
             TextButton(
                 onClick = onCancel,
                 modifier = Modifier
@@ -313,9 +268,76 @@ private fun ListeningContent(
 }
 
 @Composable
-private fun FinishedContent(
+private fun NothingHeardContent(
+    onTryAgain: () -> Unit,
+    onGiveUp: () -> Unit,
+) {
+    Surface(color = MaterialTheme.colorScheme.background) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .safeDrawingPadding()
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_mic),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(40.dp),
+            )
+            Text(
+                text = stringResource(R.string.capture_nothing_heard_title),
+                style = MaterialTheme.typography.headlineMedium,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                text = stringResource(R.string.capture_nothing_heard_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(8.dp))
+            PrimaryButton(text = stringResource(R.string.capture_try_again), onClick = onTryAgain)
+            TextButton(
+                onClick = onGiveUp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+            ) {
+                Text(stringResource(R.string.capture_give_up))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExtractingContent() {
+    Surface(color = MaterialTheme.colorScheme.background) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .safeDrawingPadding()
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterVertically),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            CircularProgressIndicator()
+            Text(
+                text = stringResource(R.string.capture_extracting),
+                style = MaterialTheme.typography.titleMedium,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ResultContent(
     state: CaptureUiState,
-    onRetry: () -> Unit,
+    onSpeakAgain: () -> Unit,
+    onRetryExtraction: () -> Unit,
 ) {
     Surface(color = MaterialTheme.colorScheme.background) {
         Column(
@@ -325,41 +347,152 @@ private fun FinishedContent(
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(stringResource(R.string.capture_result_title), style = MaterialTheme.typography.headlineLarge)
-            state.error?.let {
-                Text(
-                    text = stringResource(it.messageRes()),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Surface(
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                shape = MaterialTheme.shapes.large,
-                color = MaterialTheme.colorScheme.surface,
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(
-                    text = state.transcript.ifEmpty { stringResource(R.string.capture_empty_result) },
-                    style = MaterialTheme.typography.bodyLarge,
+                val failure = state.failure
+                val result = state.result
+                when {
+                    failure != null -> MessageBlock(stringResource(failure.messageRes()))
+                    result is ExtractionResult.Plan -> {
+                        Text(
+                            text = pluralStringResource(
+                                R.plurals.capture_result_plan_title,
+                                result.drafts.size,
+                                result.drafts.size,
+                            ),
+                            style = MaterialTheme.typography.headlineLarge,
+                        )
+                        result.drafts.forEach { DraftCard(it) }
+                    }
+                    result == ExtractionResult.OffTopic -> MessageBlock(stringResource(R.string.capture_off_topic))
+                    result == ExtractionResult.NothingPlanned ->
+                        MessageBlock(stringResource(R.string.capture_nothing_planned))
+                }
+                TranscriptSection(state.committedText)
+            }
+
+            if (state.failure != null) {
+                PrimaryButton(text = stringResource(R.string.capture_try_again), onClick = onRetryExtraction)
+                TextButton(
+                    onClick = onSpeakAgain,
                     modifier = Modifier
-                        .padding(16.dp)
-                        .verticalScroll(rememberScrollState()),
-                )
-            }
-            Button(
-                onClick = onRetry,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = MaterialTheme.shapes.medium,
-            ) {
-                Text(stringResource(R.string.capture_retry), style = MaterialTheme.typography.labelLarge)
+                        .fillMaxWidth()
+                        .height(48.dp),
+                ) {
+                    Text(stringResource(R.string.capture_retry))
+                }
+            } else {
+                PrimaryButton(text = stringResource(R.string.capture_retry), onClick = onSpeakAgain)
             }
         }
     }
 }
+
+@Composable
+private fun MessageBlock(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.headlineSmall,
+        modifier = Modifier.padding(top = 24.dp),
+    )
+}
+
+/** Raw draft from the AI, prototype only; editing comes with the review cards in phase 1. */
+@Composable
+private fun DraftCard(draft: TaskDraft) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surface,
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(draft.title, style = MaterialTheme.typography.titleLarge)
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Chip(
+                    text = draft.date?.let(::formatDate) ?: stringResource(R.string.capture_draft_no_date),
+                    missing = draft.date == null,
+                )
+                Chip(
+                    text = draft.time?.let(::formatTime) ?: stringResource(R.string.capture_draft_no_time),
+                    missing = false,
+                )
+                draft.durationMinutes?.let {
+                    Chip(text = stringResource(R.string.capture_draft_duration, it), missing = false)
+                }
+            }
+            draft.reminderText?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun Chip(text: String, missing: Boolean) {
+    val colors = MaterialTheme.colorScheme
+    Surface(
+        shape = MaterialTheme.shapes.extraSmall,
+        color = if (missing) colors.primaryContainer else colors.surfaceVariant,
+        contentColor = if (missing) colors.onPrimaryContainer else colors.onSurface,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+        )
+    }
+}
+
+/** What was said, folded by default (kept visible in the prototype for checking the AI). */
+@Composable
+private fun TranscriptSection(transcript: String) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        TextButton(onClick = { expanded = !expanded }) {
+            Text(
+                stringResource(if (expanded) R.string.capture_hide_transcript else R.string.capture_show_transcript),
+            )
+        }
+        if (expanded) {
+            Text(
+                text = transcript,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PrimaryButton(text: String, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp),
+        shape = MaterialTheme.shapes.medium,
+    ) {
+        Text(text, style = MaterialTheme.typography.labelLarge)
+    }
+}
+
+private fun formatDate(date: LocalDate): String = date.format(DATE_FORMAT)
+
+private fun formatTime(time: LocalTime): String = time.format(TIME_FORMAT)
 
 private fun SpeechError.messageRes(): Int = when (this) {
     SpeechError.NoSpeech -> R.string.capture_empty_result
@@ -371,7 +504,15 @@ private fun SpeechError.messageRes(): Int = when (this) {
     SpeechError.Other -> R.string.capture_error_generic
 }
 
-private val previewTranscript =
+private fun ExtractionFailure.messageRes(): Int = when (this) {
+    ExtractionFailure.Offline -> R.string.capture_failure_offline
+    ExtractionFailure.RateLimited -> R.string.capture_failure_rate_limited
+    ExtractionFailure.ServerError -> R.string.capture_failure_server
+    ExtractionFailure.BadResponse -> R.string.capture_failure_bad_response
+    ExtractionFailure.NotConfigured -> R.string.capture_failure_not_configured
+}
+
+private const val PREVIEW_TRANSCRIPT =
     "Yarın sabah onda maç var, öğleden sonra üç buçukta markete gideceğim, bir de annemi aramam lazım"
 
 @Composable
@@ -384,15 +525,12 @@ private fun CapturePreview(state: CaptureUiState, permission: MicPermissionStatu
             onOpenSettings = {},
             onFinish = {},
             onCancel = {},
-            onRetry = {},
-            onTryAgain = {},
+            onSpeakAgain = {},
+            onListenAgain = {},
+            onRetryExtraction = {},
         )
     }
 }
-
-@Preview(showBackground = true)
-@Composable
-private fun NothingHeardPreview() = CapturePreview(CaptureUiState(phase = CapturePhase.NothingHeard))
 
 @Preview(showBackground = true)
 @Composable
@@ -405,11 +543,35 @@ private fun IdleBlockedPreview() = CapturePreview(CaptureUiState(), MicPermissio
 @Preview(showBackground = true)
 @Composable
 private fun ListeningPreview() = CapturePreview(
-    CaptureUiState(phase = CapturePhase.Listening, committedText = previewTranscript, partialText = "ve akşam"),
+    CaptureUiState(phase = CapturePhase.Listening, committedText = PREVIEW_TRANSCRIPT, partialText = "ve akşam"),
 )
 
 @Preview(showBackground = true)
 @Composable
-private fun FinishedPreview() = CapturePreview(
-    CaptureUiState(phase = CapturePhase.Finished, committedText = previewTranscript),
+private fun NothingHeardPreview() = CapturePreview(CaptureUiState(phase = CapturePhase.NothingHeard))
+
+@Preview(showBackground = true)
+@Composable
+private fun ExtractingPreview() = CapturePreview(CaptureUiState(phase = CapturePhase.Extracting))
+
+@Preview(showBackground = true)
+@Composable
+private fun ResultPlanPreview() = CapturePreview(
+    CaptureUiState(
+        phase = CapturePhase.Result,
+        committedText = PREVIEW_TRANSCRIPT,
+        result = ExtractionResult.Plan(
+            listOf(
+                TaskDraft("Maç izle", LocalDate.of(2026, 10, 12), LocalTime.of(10, 0), 120, "Maç saati geldi, hazır mısın?"),
+                TaskDraft("Markete git", LocalDate.of(2026, 10, 12), LocalTime.of(15, 30), null, null),
+                TaskDraft("Annemi ara", null, null, null, "Anneni aramayı unutma."),
+            ),
+        ),
+    ),
+)
+
+@Preview(showBackground = true)
+@Composable
+private fun ResultOfflinePreview() = CapturePreview(
+    CaptureUiState(phase = CapturePhase.Result, committedText = PREVIEW_TRANSCRIPT, failure = ExtractionFailure.Offline),
 )
