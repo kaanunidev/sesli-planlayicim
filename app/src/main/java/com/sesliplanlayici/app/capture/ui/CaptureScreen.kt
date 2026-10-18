@@ -383,7 +383,7 @@ private fun ResultContent(
                         .fillMaxWidth()
                         .height(48.dp),
                 ) {
-                    Text(stringResource(R.string.capture_retry))
+                    Text(stringResource(R.string.capture_back_to_start))
                 }
             } else {
                 PrimaryButton(text = stringResource(R.string.capture_retry), onClick = onSpeakAgain)

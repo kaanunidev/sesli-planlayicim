@@ -24,6 +24,7 @@
     <string name="capture_nothing_heard_body">Mikrofonun açık mı, bir kontrol eder misin? Hazır olunca tekrar dene.</string>
     <string name="capture_try_again">Tekrar dene</string>
     <string name="capture_give_up">Vazgeç</string>
+    <string name="capture_back_to_start">Ana menüye dön</string>
     <string name="capture_extracting">Görevlerini çıkarıyorum…</string>
     <plurals name="capture_result_plan_title">
         <item quantity="one">%d iş buldum</item>
