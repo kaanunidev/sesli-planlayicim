@@ -1,19 +1,34 @@
 package com.sesliplanlayici.app.review.ui
 
 import com.sesliplanlayici.app.capture.domain.TaskDraft
+import com.sesliplanlayici.app.core.domain.Task
+import com.sesliplanlayici.app.core.domain.TaskRepository
 import com.sesliplanlayici.app.core.domain.TaskSource
 import com.sesliplanlayici.app.review.data.PendingDrafts
+import com.sesliplanlayici.app.review.domain.SaveDraftsUseCase
+import java.io.IOException
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class ReviewViewModelTest {
 
     // 2026-10-11 21:40 in Istanbul.
@@ -23,17 +38,90 @@ class ReviewViewModelTest {
     private val match = TaskDraft("Maç izle", tomorrow, LocalTime.of(10, 0), 120, null)
     private val callMom = TaskDraft("Annemi ara", null, null, null, null)
 
+    private val dispatcher = StandardTestDispatcher()
+
+    private class FakeRepository(var fail: Boolean = false) : TaskRepository {
+        val saved = mutableListOf<List<Task>>()
+
+        override suspend fun addAll(tasks: List<Task>): Result<Unit> {
+            if (fail) return Result.failure(IOException("disk full"))
+            saved += tasks
+            return Result.success(Unit)
+        }
+    }
+
+    private val repository = FakeRepository()
+
+    @Before
+    fun setUp() = Dispatchers.setMain(dispatcher)
+
+    @After
+    fun tearDown() = Dispatchers.resetMain()
+
     private fun viewModel(vararg drafts: TaskDraft): ReviewViewModel {
         val pending = PendingDrafts().apply { put(drafts.toList()) }
-        return ReviewViewModel(pending, clock)
+        return ReviewViewModel(pending, clock, SaveDraftsUseCase(repository, clock))
     }
 
     private val ReviewViewModel.state get() = uiState.value
 
     @Test
+    fun saveAllStoresTheCardsAndReportsTheCount() = runTest(dispatcher) {
+        val vm = viewModel(match, callMom)
+        vm.setDate(vm.state.items[1].id, tomorrow)
+
+        vm.saveAll()
+        advanceUntilIdle()
+
+        assertEquals(ReviewEvent.Saved(2), vm.events.first())
+        assertEquals(listOf("Maç izle", "Annemi ara"), repository.saved.single().map { it.title })
+    }
+
+    @Test
+    fun saveAllDoesNothingWhileADayIsMissing() = runTest(dispatcher) {
+        val vm = viewModel(match, callMom)
+
+        vm.saveAll()
+        advanceUntilIdle()
+
+        assertTrue(repository.saved.isEmpty())
+        assertFalse(vm.state.isSaving)
+    }
+
+    @Test
+    fun doubleTapSavesOnce() = runTest(dispatcher) {
+        val vm = viewModel(match)
+
+        vm.saveAll()
+        vm.saveAll()
+        advanceUntilIdle()
+
+        assertEquals(1, repository.saved.size)
+    }
+
+    @Test
+    fun storageFailureKeepsTheCardsForAnotherTry() = runTest(dispatcher) {
+        repository.fail = true
+        val vm = viewModel(match)
+
+        vm.saveAll()
+        advanceUntilIdle()
+
+        assertTrue(vm.state.saveFailed)
+        assertFalse(vm.state.isSaving)
+        assertEquals(listOf(match), vm.state.items.map { it.draft })
+
+        repository.fail = false
+        vm.saveAll()
+        advanceUntilIdle()
+        assertEquals(1, repository.saved.size)
+        assertFalse(vm.state.saveFailed)
+    }
+
+    @Test
     fun draftsBecomeVoiceCardsAndArePickedUpOnce() {
         val pending = PendingDrafts().apply { put(listOf(match, callMom)) }
-        val vm = ReviewViewModel(pending, clock)
+        val vm = ReviewViewModel(pending, clock, SaveDraftsUseCase(repository, clock))
 
         assertEquals(listOf(match, callMom), vm.state.items.map { it.draft })
         assertTrue(vm.state.items.all { it.source == TaskSource.VOICE })

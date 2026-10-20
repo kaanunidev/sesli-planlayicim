@@ -1,21 +1,28 @@
 package com.sesliplanlayici.app.review.ui
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.sesliplanlayici.app.capture.domain.TaskDraft
 import com.sesliplanlayici.app.core.domain.TaskSource
 import com.sesliplanlayici.app.review.data.PendingDrafts
 import com.sesliplanlayici.app.review.domain.ReviewItem
 import com.sesliplanlayici.app.review.domain.ReviewRules
+import com.sesliplanlayici.app.review.domain.SaveDraftsResult
+import com.sesliplanlayici.app.review.domain.SaveDraftsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Clock
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import javax.inject.Inject
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 data class ReviewUiState(
     val items: List<ReviewItem> = emptyList(),
@@ -25,6 +32,9 @@ data class ReviewUiState(
     val editingIsNew: Boolean = false,
     /** Set once the user changes anything, to confirm before throwing the edits away. */
     val hasChanges: Boolean = false,
+    val isSaving: Boolean = false,
+    /** The last save attempt failed in storage; the cards are kept for another try. */
+    val saveFailed: Boolean = false,
     val now: LocalDateTime,
 ) {
     val today: LocalDate get() = now.toLocalDate()
@@ -32,13 +42,21 @@ data class ReviewUiState(
     val fromVoice: Boolean get() = items.any { it.source == TaskSource.VOICE }
 }
 
+sealed interface ReviewEvent {
+    data class Saved(val count: Int) : ReviewEvent
+}
+
 @HiltViewModel
 class ReviewViewModel @Inject constructor(
     pendingDrafts: PendingDrafts,
     clock: Clock,
+    private val saveDrafts: SaveDraftsUseCase,
 ) : ViewModel() {
 
     private var nextId = 0L
+
+    private val _events = Channel<ReviewEvent>(Channel.BUFFERED)
+    val events: Flow<ReviewEvent> = _events.receiveAsFlow()
 
     private val _uiState: MutableStateFlow<ReviewUiState>
     val uiState: StateFlow<ReviewUiState>
@@ -55,6 +73,21 @@ class ReviewViewModel @Inject constructor(
         }
         _uiState = MutableStateFlow(initial)
         uiState = _uiState.asStateFlow()
+    }
+
+    /** "Hepsini kaydet". Only the reviewed tasks are stored, never the transcript (AGENTS rule 3). */
+    fun saveAll() {
+        val state = _uiState.value
+        // isSaving also stops a double tap from saving twice.
+        if (!state.canSave || state.isSaving) return
+        _uiState.update { it.copy(isSaving = true, saveFailed = false) }
+        viewModelScope.launch {
+            when (val result = saveDrafts(state.items)) {
+                is SaveDraftsResult.Saved -> _events.send(ReviewEvent.Saved(result.count))
+                SaveDraftsResult.MissingDate, SaveDraftsResult.Failed ->
+                    _uiState.update { it.copy(isSaving = false, saveFailed = true) }
+            }
+        }
     }
 
     fun setDate(id: Long, date: LocalDate) = updateDraft(id) { it.copy(date = date) }

@@ -36,6 +36,7 @@ import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -76,12 +77,22 @@ private val SHORT_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM",
 private val WEEKDAY: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE", TURKISH)
 private val TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
-// Saving arrives with step B (Room); until then the button stays visible but disabled.
-private const val SAVE_AVAILABLE = false
-
 @Composable
-fun ReviewScreen(onBack: () -> Unit, viewModel: ReviewViewModel = hiltViewModel()) {
+fun ReviewScreen(
+    onBack: () -> Unit,
+    onSaved: (count: Int) -> Unit,
+    viewModel: ReviewViewModel = hiltViewModel(),
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(viewModel) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is ReviewEvent.Saved -> onSaved(event.count)
+            }
+        }
+    }
+
     ReviewContent(
         state = state,
         onPickDate = viewModel::setDate,
@@ -91,6 +102,7 @@ fun ReviewScreen(onBack: () -> Unit, viewModel: ReviewViewModel = hiltViewModel(
         onCancelEdit = viewModel::cancelEditing,
         onDelete = viewModel::delete,
         onAddManual = viewModel::addManual,
+        onSaveAll = viewModel::saveAll,
         onSpeakAgain = onBack,
     )
 }
@@ -105,6 +117,7 @@ fun ReviewContent(
     onCancelEdit: () -> Unit,
     onDelete: (Long) -> Unit,
     onAddManual: () -> Unit,
+    onSaveAll: () -> Unit,
     onSpeakAgain: () -> Unit,
 ) {
     // Which picker is open is short-lived UI state; the card data lives in the ViewModel.
@@ -171,16 +184,25 @@ fun ReviewContent(
             }
 
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    text = stringResource(
-                        if (state.canSave) R.string.review_save_coming else R.string.review_save_needs_days,
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                val hint = when {
+                    state.saveFailed -> R.string.review_save_failed
+                    !state.canSave -> R.string.review_save_needs_days
+                    else -> null
+                }
+                hint?.let {
+                    Text(
+                        text = stringResource(it),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (state.saveFailed) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                }
                 Button(
-                    onClick = {},
-                    enabled = SAVE_AVAILABLE && state.canSave,
+                    onClick = onSaveAll,
+                    enabled = state.canSave && !state.isSaving,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
@@ -580,6 +602,7 @@ private fun ReviewContentPreview() {
             onCancelEdit = {},
             onDelete = {},
             onAddManual = {},
+            onSaveAll = {},
             onSpeakAgain = {},
         )
     }

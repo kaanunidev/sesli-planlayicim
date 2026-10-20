@@ -46,6 +46,11 @@ android {
     }
 }
 
+ksp {
+    // Room writes each database version's schema here; it is committed to review migrations.
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
@@ -63,6 +68,10 @@ dependencies {
     implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
 
     implementation(libs.kotlinx.serialization.json)
+
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
 
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.okhttp)

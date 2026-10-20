@@ -60,7 +60,11 @@
     <string name="review_empty">Liste boş. Elle ekleyebilir ya da tekrar konuşabilirsin.</string>
     <string name="review_save_all">Hepsini kaydet</string>
     <string name="review_save_needs_days">Kaydetmeden önce her işin gününü seç.</string>
-    <string name="review_save_coming">Kaydetme bir sonraki adımda geliyor.</string>
+    <string name="review_save_failed">Kaydedemedim. Tekrar dener misin?</string>
+    <plurals name="capture_saved_message">
+        <item quantity="one">%d iş kaydedildi</item>
+        <item quantity="other">%d iş kaydedildi</item>
+    </plurals>
     <string name="review_speak_again">Tekrar konuş</string>
     <string name="review_discard_title">Değişiklikler silinsin mi?</string>
     <string name="review_discard_body">Düzenlediklerin henüz kaydedilmedi.</string>

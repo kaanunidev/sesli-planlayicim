@@ -24,6 +24,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -32,6 +34,8 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -39,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -55,6 +60,7 @@ import com.sesliplanlayici.app.capture.domain.SpeechError
 import com.sesliplanlayici.app.core.ui.findActivity
 import com.sesliplanlayici.app.core.ui.openAppSettings
 import com.sesliplanlayici.app.core.ui.theme.SesliPlanlayiciTheme
+import kotlinx.coroutines.launch
 
 private const val MIC_PERMISSION = Manifest.permission.RECORD_AUDIO
 
@@ -64,9 +70,16 @@ private const val MIC_PERMISSION = Manifest.permission.RECORD_AUDIO
  * The permission is asked when the user taps the mic, not on launch.
  */
 @Composable
-fun CaptureScreen(onOpenReview: () -> Unit, viewModel: CaptureViewModel = hiltViewModel()) {
+fun CaptureScreen(
+    onOpenReview: () -> Unit,
+    /** Tasks just saved on the review screen; shown once as a short message. */
+    savedCount: Int?,
+    onSavedMessageShown: () -> Unit,
+    viewModel: CaptureViewModel = hiltViewModel(),
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
@@ -75,6 +88,17 @@ fun CaptureScreen(onOpenReview: () -> Unit, viewModel: CaptureViewModel = hiltVi
             }
         }
     }
+
+    // The snackbar runs in the screen's scope: clearing savedCount must not cancel it.
+    val scope = rememberCoroutineScope()
+    val savedMessage = savedCount?.let { pluralStringResource(R.plurals.capture_saved_message, it, it) }
+    LaunchedEffect(savedMessage) {
+        if (savedMessage != null) {
+            scope.launch { snackbarHostState.showSnackbar(savedMessage) }
+            onSavedMessageShown()
+        }
+    }
+
     fun hasPermission() =
         ContextCompat.checkSelfPermission(context, MIC_PERMISSION) == PackageManager.PERMISSION_GRANTED
 
@@ -96,24 +120,33 @@ fun CaptureScreen(onOpenReview: () -> Unit, viewModel: CaptureViewModel = hiltVi
 
     LightStatusBarIcons(light = state.phase == CapturePhase.Listening)
 
-    CaptureContent(
-        state = state,
-        permission = permission,
-        onMicClick = {
-            when (permission) {
-                MicPermissionStatus.Granted -> viewModel.startListening()
-                MicPermissionStatus.NotGranted -> launcher.launch(MIC_PERMISSION)
-                MicPermissionStatus.Blocked -> context.openAppSettings()
-            }
-        },
-        onOpenSettings = { context.openAppSettings() },
-        onFinish = viewModel::finish,
-        onCancel = viewModel::reset,
-        onSpeakAgain = viewModel::reset,
-        onListenAgain = viewModel::startListening,
-        onRetryExtraction = viewModel::retryExtraction,
-        onAddManually = viewModel::addManually,
-    )
+    Box(modifier = Modifier.fillMaxSize()) {
+        CaptureContent(
+            state = state,
+            permission = permission,
+            onMicClick = {
+                when (permission) {
+                    MicPermissionStatus.Granted -> viewModel.startListening()
+                    MicPermissionStatus.NotGranted -> launcher.launch(MIC_PERMISSION)
+                    MicPermissionStatus.Blocked -> context.openAppSettings()
+                }
+            },
+            onOpenSettings = { context.openAppSettings() },
+            onFinish = viewModel::finish,
+            onCancel = viewModel::reset,
+            onSpeakAgain = viewModel::reset,
+            onListenAgain = viewModel::startListening,
+            onRetryExtraction = viewModel::retryExtraction,
+            onAddManually = viewModel::addManually,
+        )
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .safeDrawingPadding()
+                .padding(16.dp),
+        )
+    }
 }
 
 /** The recording screen is dark; flip the status bar icons while it is shown. */
