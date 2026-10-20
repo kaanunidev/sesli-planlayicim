@@ -8,10 +8,12 @@ import com.sesliplanlayici.app.capture.domain.SpeechEvent
 import com.sesliplanlayici.app.capture.domain.SpeechToText
 import com.sesliplanlayici.app.capture.domain.TaskDraft
 import com.sesliplanlayici.app.capture.domain.TaskExtractor
+import com.sesliplanlayici.app.review.data.PendingDrafts
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -55,6 +57,7 @@ class CaptureViewModelTest {
     }
 
     private val plan = ExtractionResult.Plan(listOf(TaskDraft("Maç izle", null, null, null, null)))
+    private val pending = PendingDrafts()
 
     @Before
     fun setUp() = Dispatchers.setMain(dispatcher)
@@ -72,7 +75,7 @@ class CaptureViewModelTest {
             listOf(SpeechEvent.Partial("bir de")),
         )
         val extractor = FakeExtractor(ExtractionOutcome.Success(plan))
-        val viewModel = CaptureViewModel(speech, extractor)
+        val viewModel = CaptureViewModel(speech, extractor, pending)
 
         viewModel.startListening()
         runCurrent()
@@ -82,13 +85,26 @@ class CaptureViewModelTest {
         advanceUntilIdle()
 
         assertEquals(listOf("Yarın maç var annemi ara bir de"), extractor.transcripts)
-        assertEquals(CapturePhase.Result, viewModel.uiState.value.phase)
-        assertEquals(plan, viewModel.uiState.value.result)
+        // A plan goes to the review screen; capture starts over and keeps no transcript.
+        assertEquals(CaptureEvent.OpenReview, viewModel.events.first())
+        assertEquals(plan.drafts, pending.take())
+        assertEquals(CaptureUiState(), viewModel.uiState.value)
+    }
+
+    @Test
+    fun addManuallyOpensReviewWithoutDrafts() = test {
+        pending.put(plan.drafts)
+        val viewModel = CaptureViewModel(FakeSpeech(), FakeExtractor(), pending)
+
+        viewModel.addManually()
+
+        assertEquals(CaptureEvent.OpenReview, viewModel.events.first())
+        assertEquals(emptyList<TaskDraft>(), pending.take())
     }
 
     @Test
     fun silenceShowsNothingHeard() = test {
-        val viewModel = CaptureViewModel(FakeSpeech(), FakeExtractor())
+        val viewModel = CaptureViewModel(FakeSpeech(), FakeExtractor(), pending)
 
         viewModel.startListening()
         advanceTimeBy(CaptureViewModel.NOTHING_HEARD_TIMEOUT_MS + 1)
@@ -102,7 +118,7 @@ class CaptureViewModelTest {
             listOf(SpeechEvent.Failed(SpeechError.NoSpeech)),
             listOf(SpeechEvent.Final("Maç var")),
         )
-        val viewModel = CaptureViewModel(speech, FakeExtractor())
+        val viewModel = CaptureViewModel(speech, FakeExtractor(), pending)
 
         viewModel.startListening()
         runCurrent()
@@ -114,7 +130,7 @@ class CaptureViewModelTest {
     @Test
     fun finishingWithNothingHeardDoesNotCallTheProxy() = test {
         val extractor = FakeExtractor()
-        val viewModel = CaptureViewModel(FakeSpeech(), extractor)
+        val viewModel = CaptureViewModel(FakeSpeech(), extractor, pending)
 
         viewModel.startListening()
         runCurrent()
@@ -131,7 +147,7 @@ class CaptureViewModelTest {
             ExtractionOutcome.Failure(ExtractionFailure.Offline),
             ExtractionOutcome.Success(plan),
         )
-        val viewModel = CaptureViewModel(FakeSpeech(listOf(SpeechEvent.Final("Maç var"))), extractor)
+        val viewModel = CaptureViewModel(FakeSpeech(listOf(SpeechEvent.Final("Maç var"))), extractor, pending)
 
         viewModel.startListening()
         runCurrent()
@@ -144,14 +160,14 @@ class CaptureViewModelTest {
 
         assertEquals(listOf("Maç var", "Maç var"), extractor.transcripts)
         assertNull(viewModel.uiState.value.failure)
-        assertEquals(plan, viewModel.uiState.value.result)
+        assertEquals(plan.drafts, pending.take())
     }
 
     @Test
     fun repeatedInterruptionsBecomeNetworkError() = test {
         val interrupted = listOf(SpeechEvent.Failed(SpeechError.Interrupted))
         val speech = FakeSpeech(interrupted, interrupted, interrupted, interrupted, interrupted)
-        val viewModel = CaptureViewModel(speech, FakeExtractor())
+        val viewModel = CaptureViewModel(speech, FakeExtractor(), pending)
 
         viewModel.startListening()
         advanceTimeBy(5_000)
@@ -164,19 +180,20 @@ class CaptureViewModelTest {
     @Test
     fun errorAfterSpeechStillSendsWhatWasHeard() = test {
         val speech = FakeSpeech(listOf(SpeechEvent.Partial("Maç var"), SpeechEvent.Failed(SpeechError.Network)))
-        val extractor = FakeExtractor(ExtractionOutcome.Success(plan))
-        val viewModel = CaptureViewModel(speech, extractor)
+        val extractor = FakeExtractor(ExtractionOutcome.Success(ExtractionResult.OffTopic))
+        val viewModel = CaptureViewModel(speech, extractor, pending)
 
         viewModel.startListening()
         advanceUntilIdle()
 
         assertEquals(listOf("Maç var"), extractor.transcripts)
         assertEquals(CapturePhase.Result, viewModel.uiState.value.phase)
+        assertEquals(ExtractionResult.OffTopic, viewModel.uiState.value.result)
     }
 
     @Test
     fun resetDropsEverything() = test {
-        val viewModel = CaptureViewModel(FakeSpeech(listOf(SpeechEvent.Final("Maç var"))), FakeExtractor())
+        val viewModel = CaptureViewModel(FakeSpeech(listOf(SpeechEvent.Final("Maç var"))), FakeExtractor(), pending)
 
         viewModel.startListening()
         runCurrent()

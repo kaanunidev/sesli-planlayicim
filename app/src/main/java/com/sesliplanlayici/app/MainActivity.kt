@@ -6,7 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import com.sesliplanlayici.app.capture.ui.CaptureScreen
+import com.sesliplanlayici.app.core.ui.navigation.AppNavHost
 import com.sesliplanlayici.app.core.ui.theme.SesliPlanlayiciTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -21,7 +21,7 @@ class MainActivity : ComponentActivity() {
         )
         setContent {
             SesliPlanlayiciTheme {
-                CaptureScreen()
+                AppNavHost()
             }
         }
     }

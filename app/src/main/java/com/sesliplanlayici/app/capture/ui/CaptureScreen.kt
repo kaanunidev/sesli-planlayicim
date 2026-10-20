@@ -8,7 +8,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -39,7 +39,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -53,28 +52,29 @@ import com.sesliplanlayici.app.R
 import com.sesliplanlayici.app.capture.domain.ExtractionFailure
 import com.sesliplanlayici.app.capture.domain.ExtractionResult
 import com.sesliplanlayici.app.capture.domain.SpeechError
-import com.sesliplanlayici.app.capture.domain.TaskDraft
 import com.sesliplanlayici.app.core.ui.findActivity
 import com.sesliplanlayici.app.core.ui.openAppSettings
 import com.sesliplanlayici.app.core.ui.theme.SesliPlanlayiciTheme
-import java.time.LocalDate
-import java.time.LocalTime
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 private const val MIC_PERMISSION = Manifest.permission.RECORD_AUDIO
-private val DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMMM EEEE", Locale.forLanguageTag("tr-TR"))
-private val TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
 /**
- * Prototype capture screen: microphone permission, live speech-to-text, then the tasks the AI
- * extracted, shown raw. The real review cards come in phase 1.
+ * Capture screen: microphone permission, live speech-to-text, sending the transcript to the AI.
+ * A plan opens the review screen ([onOpenReview]); other outcomes are shown here.
  * The permission is asked when the user taps the mic, not on launch.
  */
 @Composable
-fun CaptureScreen(viewModel: CaptureViewModel = hiltViewModel()) {
+fun CaptureScreen(onOpenReview: () -> Unit, viewModel: CaptureViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+
+    LaunchedEffect(viewModel) {
+        viewModel.events.collect { event ->
+            when (event) {
+                CaptureEvent.OpenReview -> onOpenReview()
+            }
+        }
+    }
     fun hasPermission() =
         ContextCompat.checkSelfPermission(context, MIC_PERMISSION) == PackageManager.PERMISSION_GRANTED
 
@@ -112,6 +112,7 @@ fun CaptureScreen(viewModel: CaptureViewModel = hiltViewModel()) {
         onSpeakAgain = viewModel::reset,
         onListenAgain = viewModel::startListening,
         onRetryExtraction = viewModel::retryExtraction,
+        onAddManually = viewModel::addManually,
     )
 }
 
@@ -139,13 +140,18 @@ fun CaptureContent(
     onSpeakAgain: () -> Unit,
     onListenAgain: () -> Unit,
     onRetryExtraction: () -> Unit,
+    onAddManually: () -> Unit,
 ) {
     when (state.phase) {
         CapturePhase.Idle -> IdleContent(permission, state.error, onMicClick, onOpenSettings)
         CapturePhase.Listening -> ListeningContent(state, onFinish, onCancel)
-        CapturePhase.NothingHeard -> NothingHeardContent(onTryAgain = onListenAgain, onGiveUp = onCancel)
+        CapturePhase.NothingHeard -> NothingHeardContent(
+            onTryAgain = onListenAgain,
+            onAddManually = onAddManually,
+            onGiveUp = onCancel,
+        )
         CapturePhase.Extracting -> ExtractingContent()
-        CapturePhase.Result -> ResultContent(state, onSpeakAgain, onRetryExtraction)
+        CapturePhase.Result -> ResultContent(state, onSpeakAgain, onRetryExtraction, onAddManually)
     }
 }
 
@@ -270,6 +276,7 @@ private fun ListeningContent(
 @Composable
 private fun NothingHeardContent(
     onTryAgain: () -> Unit,
+    onAddManually: () -> Unit,
     onGiveUp: () -> Unit,
 ) {
     Surface(color = MaterialTheme.colorScheme.background) {
@@ -300,14 +307,8 @@ private fun NothingHeardContent(
             )
             Spacer(Modifier.height(8.dp))
             PrimaryButton(text = stringResource(R.string.capture_try_again), onClick = onTryAgain)
-            TextButton(
-                onClick = onGiveUp,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-            ) {
-                Text(stringResource(R.string.capture_give_up))
-            }
+            SecondaryButton(text = stringResource(R.string.capture_add_manually), onClick = onAddManually)
+            SecondaryButton(text = stringResource(R.string.capture_give_up), onClick = onGiveUp)
         }
     }
 }
@@ -338,6 +339,7 @@ private fun ResultContent(
     state: CaptureUiState,
     onSpeakAgain: () -> Unit,
     onRetryExtraction: () -> Unit,
+    onAddManually: () -> Unit,
 ) {
     Surface(color = MaterialTheme.colorScheme.background) {
         Column(
@@ -353,40 +355,23 @@ private fun ResultContent(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                val failure = state.failure
-                val result = state.result
-                when {
-                    failure != null -> MessageBlock(stringResource(failure.messageRes()))
-                    result is ExtractionResult.Plan -> {
-                        Text(
-                            text = pluralStringResource(
-                                R.plurals.capture_result_plan_title,
-                                result.drafts.size,
-                                result.drafts.size,
-                            ),
-                            style = MaterialTheme.typography.headlineLarge,
-                        )
-                        result.drafts.forEach { DraftCard(it) }
-                    }
-                    result == ExtractionResult.OffTopic -> MessageBlock(stringResource(R.string.capture_off_topic))
-                    result == ExtractionResult.NothingPlanned ->
-                        MessageBlock(stringResource(R.string.capture_nothing_planned))
+                // A plan opens the review screen, so only the other outcomes are shown here.
+                val message = when {
+                    state.failure != null -> state.failure.messageRes()
+                    state.result == ExtractionResult.OffTopic -> R.string.capture_off_topic
+                    else -> R.string.capture_nothing_planned
                 }
+                MessageBlock(stringResource(message))
                 TranscriptSection(state.committedText)
             }
 
             if (state.failure != null) {
                 PrimaryButton(text = stringResource(R.string.capture_try_again), onClick = onRetryExtraction)
-                TextButton(
-                    onClick = onSpeakAgain,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
-                ) {
-                    Text(stringResource(R.string.capture_back_to_start))
-                }
+                SecondaryButton(text = stringResource(R.string.capture_add_manually), onClick = onAddManually)
+                SecondaryButton(text = stringResource(R.string.capture_back_to_start), onClick = onSpeakAgain)
             } else {
                 PrimaryButton(text = stringResource(R.string.capture_retry), onClick = onSpeakAgain)
+                SecondaryButton(text = stringResource(R.string.capture_add_manually), onClick = onAddManually)
             }
         }
     }
@@ -399,62 +384,6 @@ private fun MessageBlock(text: String) {
         style = MaterialTheme.typography.headlineSmall,
         modifier = Modifier.padding(top = 24.dp),
     )
-}
-
-/** Raw draft from the AI, prototype only; editing comes with the review cards in phase 1. */
-@Composable
-private fun DraftCard(draft: TaskDraft) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surface,
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(draft.title, style = MaterialTheme.typography.titleLarge)
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Chip(
-                    text = draft.date?.let(::formatDate) ?: stringResource(R.string.capture_draft_no_date),
-                    missing = draft.date == null,
-                )
-                Chip(
-                    text = draft.time?.let(::formatTime) ?: stringResource(R.string.capture_draft_no_time),
-                    missing = false,
-                )
-                draft.durationMinutes?.let {
-                    Chip(text = stringResource(R.string.capture_draft_duration, it), missing = false)
-                }
-            }
-            draft.reminderText?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun Chip(text: String, missing: Boolean) {
-    val colors = MaterialTheme.colorScheme
-    Surface(
-        shape = MaterialTheme.shapes.extraSmall,
-        color = if (missing) colors.primaryContainer else colors.surfaceVariant,
-        contentColor = if (missing) colors.onPrimaryContainer else colors.onSurface,
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-        )
-    }
 }
 
 /** What was said, folded by default (kept visible in the prototype for checking the AI). */
@@ -490,9 +419,17 @@ private fun PrimaryButton(text: String, onClick: () -> Unit) {
     }
 }
 
-private fun formatDate(date: LocalDate): String = date.format(DATE_FORMAT)
-
-private fun formatTime(time: LocalTime): String = time.format(TIME_FORMAT)
+@Composable
+private fun SecondaryButton(text: String, onClick: () -> Unit) {
+    TextButton(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp),
+    ) {
+        Text(text)
+    }
+}
 
 private fun SpeechError.messageRes(): Int = when (this) {
     SpeechError.NoSpeech -> R.string.capture_empty_result
@@ -528,6 +465,7 @@ private fun CapturePreview(state: CaptureUiState, permission: MicPermissionStatu
             onSpeakAgain = {},
             onListenAgain = {},
             onRetryExtraction = {},
+            onAddManually = {},
         )
     }
 }
@@ -556,18 +494,8 @@ private fun ExtractingPreview() = CapturePreview(CaptureUiState(phase = CaptureP
 
 @Preview(showBackground = true)
 @Composable
-private fun ResultPlanPreview() = CapturePreview(
-    CaptureUiState(
-        phase = CapturePhase.Result,
-        committedText = PREVIEW_TRANSCRIPT,
-        result = ExtractionResult.Plan(
-            listOf(
-                TaskDraft("Maç izle", LocalDate.of(2026, 10, 12), LocalTime.of(10, 0), 120, "Maç saati geldi, hazır mısın?"),
-                TaskDraft("Markete git", LocalDate.of(2026, 10, 12), LocalTime.of(15, 30), null, null),
-                TaskDraft("Annemi ara", null, null, null, "Anneni aramayı unutma."),
-            ),
-        ),
-    ),
+private fun ResultOffTopicPreview() = CapturePreview(
+    CaptureUiState(phase = CapturePhase.Result, committedText = "Bana bir fıkra anlat", result = ExtractionResult.OffTopic),
 )
 
 @Preview(showBackground = true)

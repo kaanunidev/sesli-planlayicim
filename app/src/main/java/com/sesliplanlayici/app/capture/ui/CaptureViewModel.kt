@@ -8,16 +8,21 @@ import com.sesliplanlayici.app.capture.domain.ExtractionResult
 import com.sesliplanlayici.app.capture.domain.SpeechError
 import com.sesliplanlayici.app.capture.domain.SpeechEvent
 import com.sesliplanlayici.app.capture.domain.SpeechToText
+import com.sesliplanlayici.app.capture.domain.TaskDraft
 import com.sesliplanlayici.app.capture.domain.TaskExtractor
 import com.sesliplanlayici.app.capture.domain.appendSegment
+import com.sesliplanlayici.app.review.data.PendingDrafts
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -49,6 +54,12 @@ data class CaptureUiState(
     val transcript: String get() = appendSegment(committedText, partialText)
 }
 
+/** One-off events the screen reacts to once. */
+sealed interface CaptureEvent {
+    /** Drafts are waiting in [PendingDrafts]; empty means "Elle ekle". */
+    data object OpenReview : CaptureEvent
+}
+
 /**
  * Listens until the user taps "Bitir", then sends the transcript to the AI proxy.
  *
@@ -60,10 +71,14 @@ data class CaptureUiState(
 class CaptureViewModel @Inject constructor(
     private val speechToText: SpeechToText,
     private val taskExtractor: TaskExtractor,
+    private val pendingDrafts: PendingDrafts,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CaptureUiState())
     val uiState: StateFlow<CaptureUiState> = _uiState.asStateFlow()
+
+    private val _events = Channel<CaptureEvent>(Channel.BUFFERED)
+    val events: Flow<CaptureEvent> = _events.receiveAsFlow()
 
     private var listeningJob: Job? = null
     private var extractionJob: Job? = null
@@ -109,12 +124,30 @@ class CaptureViewModel @Inject constructor(
         _uiState.value = CaptureUiState()
     }
 
+    /** "Elle ekle": open the review screen with an empty card. */
+    fun addManually() {
+        reset()
+        openReview(emptyList())
+    }
+
+    private fun openReview(drafts: List<TaskDraft>) {
+        pendingDrafts.put(drafts)
+        // Coming back from review starts from scratch; the transcript is not kept.
+        _uiState.value = CaptureUiState()
+        _events.trySend(CaptureEvent.OpenReview)
+    }
+
     private fun extract() {
         val transcript = _uiState.value.committedText
         _uiState.update { it.copy(phase = CapturePhase.Extracting, result = null, failure = null) }
         extractionJob?.cancel()
         extractionJob = viewModelScope.launch {
             val outcome = taskExtractor.extract(transcript)
+            val result = (outcome as? ExtractionOutcome.Success)?.result
+            if (result is ExtractionResult.Plan) {
+                openReview(result.drafts)
+                return@launch
+            }
             _uiState.update {
                 when (outcome) {
                     is ExtractionOutcome.Success -> it.copy(phase = CapturePhase.Result, result = outcome.result)
